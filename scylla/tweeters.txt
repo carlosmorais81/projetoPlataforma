@@ -1,0 +1,33 @@
+CREATE KEYSPACE twitters WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy','DC1' : 1};
+USE twitters;
+CREATE TABLE twitters.twitt (
+horario text,
+created_at text,
+desc_text text,
+hashtg text,
+id_usr text,
+screen_name text,
+location text,
+followers_count text,
+friends_count text,
+listed_count text,
+created_at_usr text,
+favourites_count text,
+statuses_count text,
+retweet_count text,
+favorite_count text,
+lang text,
+dt_proc text,
+PRIMARY KEY((dt_proc)));
+
+CREATE TABLE twitters.twittarquivo (
+username text,
+description text,
+location text,
+following text,
+followers text,
+totaltweets text,
+retweetcount text,
+obs text,
+numseq text,
+PRIMARY KEY((numseq)));

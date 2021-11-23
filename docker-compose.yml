@@ -1,0 +1,92 @@
+version: '3'
+
+networks:
+  broker-kafka:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.24.0.0/16
+
+services:
+  scylla-node1:
+    image: scylladb/scylla:latest
+    networks:
+      broker-kafka:
+        ipv4_address: 172.24.160.3
+    ports:
+      - "10000:10000"
+      - "9042:9042"
+      - "9160:9160"
+      - "7000:7000"
+      - "7001:7001"
+      - "7199:7199"
+      - "9180:9180"
+      - "9100:9100"
+    command: --seeds=scylla-node1 --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+    volumes:
+      - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
+      - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
+      - "./scylla/tweeters.txt:/tweeters.txt"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    networks:
+      broker-kafka:
+        ipv4_address: 172.24.160.4
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    networks:
+      broker-kafka:
+        ipv4_address: 172.24.160.5
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://172.24.160.5:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    networks:
+      broker-kafka:
+        ipv4_address: 172.24.160.6
+    depends_on:
+      - kafka
+    ports:
+      - "19000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+
+  dev-notebook:
+    image: jupyter/pyspark-notebook
+    networks:
+      broker-kafka:
+        ipv4_address: 172.24.160.7
+    ports:
+      - "8891:8888"
+      - "4040-4080:4040-4080"
+    volumes:
+      - "./jupyter/ProducerTwitter.ipynb:/home/docker_worker/work/ProducerTwitter.ipynb"
+      - "./jupyter/ConsumerTwitter.ipynb:/home/docker_worker/work/ConsumerTwitter.ipynb"
+      - "./jupyter/IngestorBatch.ipynb:/home/docker_worker/work/IngestorBatch.ipynb"
+      - "./jupyter/twitter_arq.txt:/home/docker_worker/work/twitter_arq.txt"
+      - "./libs/spark-cassandra-connector-assembly_2.12-3.0-9.jar:/home/docker_worker/libs/spark-cassandra-connector-assembly_2.12-3.0-9.jar"
+    container_name: jupyter_notebook
+    command: "start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''"
+    user: root
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      NB_USER: docker_worker
+      NB_UID: 1008
+      NB_GID: 1011
+      CHOWN_HOME: 'yes'
+      CHOWN_HOME_OPTS: -R
